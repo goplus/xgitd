@@ -104,19 +104,31 @@ func requireSSHTools(t *testing.T) {
 
 // startHTTP starts an httptest-style server and returns its base repo URL.
 func startHTTP(t *testing.T, h wire.Handler) string {
+	return startHTTPServer(t, &wire.Server{Handler: h})
+}
+
+// startHTTPServer is startHTTP for a fully-configured Server (e.g. with an
+// Authorizer).
+func startHTTPServer(t *testing.T, srv *wire.Server) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &http.Server{Handler: xhttp.NewHandler(&wire.Server{Handler: h})}
-	go srv.Serve(l)
-	t.Cleanup(func() { srv.Close() })
+	hsrv := &http.Server{Handler: xhttp.NewHandler(srv)}
+	go hsrv.Serve(l)
+	t.Cleanup(func() { hsrv.Close() })
 	return fmt.Sprintf("http://%s/org/repo.git", l.Addr().String())
 }
 
 // startSSH starts an SSH transport and returns the port it listens on.
 func startSSH(t *testing.T, h wire.Handler) string {
+	return startSSHServer(t, &wire.Server{Handler: h})
+}
+
+// startSSHServer is startSSH for a fully-configured Server (e.g. with an
+// Authorizer).
+func startSSHServer(t *testing.T, srv *wire.Server) string {
 	t.Helper()
 	_, hostKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -130,7 +142,7 @@ func startSSH(t *testing.T, h wire.Handler) string {
 		PublicKeyCallback: xssh.FingerprintAuthCallback,
 	}
 	cfg.AddHostKey(signer)
-	tr := &xssh.Transport{Server: &wire.Server{Handler: h}, Config: cfg}
+	tr := &xssh.Transport{Server: srv, Config: cfg}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

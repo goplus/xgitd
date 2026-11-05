@@ -3,11 +3,15 @@
 // single [Handler] interface.
 //
 // The design deliberately stops at the wire. There is no object storage, no
-// pack parsing, no ref updates, and no authorization policy. A push's packfile
-// is handed to the handler as an opaque [io.Reader]; a fetch response is
-// whatever the handler writes to [Session.Out]. This keeps the protocol surface
-// small, testable, and reusable: later work can plug a real backend behind the
-// same [Handler] without touching any wire-level code.
+// pack parsing, and no ref updates. A push's packfile is handed to the handler
+// as an opaque [io.Reader]; a fetch response is whatever the handler writes to
+// [Session.Out]. This keeps the protocol surface small, testable, and reusable:
+// later work can plug a real backend behind the same [Handler] without touching
+// any wire-level code.
+//
+// The package carries no built-in authorization policy, but it offers an
+// optional gate: set [Server.Authorizer] to accept or reject each session by its
+// metadata before any handler runs. See [Authorizer].
 package wire
 
 import (
@@ -37,7 +41,9 @@ type Session struct {
 	// Version is the negotiated protocol version, 0 or 2.
 	Version int
 	// User is the SSH public-key fingerprint or the HTTP basic-auth username.
-	// It may be empty. It is surfaced but never used for authorization here.
+	// It may be empty. The transport only surfaces it; it is the
+	// [Server.Authorizer] or the handler, not the wire layer, that decides what
+	// it means for access.
 	User string
 	// RemoteAddr is the client's network address, when the transport knows it.
 	RemoteAddr string

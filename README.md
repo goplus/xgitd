@@ -86,6 +86,34 @@ repository that `git clone` and `git fetch` succeed against:
 go run ./cmd/xgitd -http :8080 -ssh :2222
 ```
 
+## Authorization
+
+By default every session is allowed and authorization is left to the handler.
+To gate access across both transports from one place, set `Server.Authorizer`.
+The hook runs once per session — after the transport has populated the
+`Session` (`Service`, `Repo`, `User`, `RemoteAddr`, `Version`) but before any
+advertisement or request dispatch — so a rejected session never reaches the
+`Handler`:
+
+```go
+srv := &wire.Server{
+	Handler: repoHandler{},
+	Authorizer: wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		if s.Service == wire.ServiceReceivePack && !mayPush(s.User, s.Repo) {
+			return fmt.Errorf("%q may not push to %q: %w", s.User, s.Repo, wire.ErrUnauthorized)
+		}
+		return nil
+	}),
+}
+```
+
+Return `nil` to allow, `wire.ErrUnauthorized` (optionally wrapped with context)
+to reject, or any other error to abort as an internal failure. A rejection
+becomes an `ERR unauthorized` pkt-line over SSH and an HTTP `403 Forbidden` over
+Smart HTTP; the wrapped detail stays server-side and never leaks to the client.
+`s.In`/`s.Out` are present but must not be touched by the authorizer — decide on
+the metadata alone. The example binary's `-read-only` flag shows the pattern.
+
 ## Testing
 
 ```sh

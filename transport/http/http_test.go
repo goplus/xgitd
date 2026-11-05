@@ -74,6 +74,10 @@ func newTestServer(h wire.Handler) *httptest.Server {
 	return httptest.NewServer(NewHandler(&wire.Server{Handler: h}))
 }
 
+func newTestServerWithAuth(h wire.Handler, auth wire.Authorizer) *httptest.Server {
+	return httptest.NewServer(NewHandler(&wire.Server{Handler: h, Authorizer: auth}))
+}
+
 func TestInfoRefsV0(t *testing.T) {
 	h := &recordHandler{}
 	ts := newTestServer(h)
@@ -314,5 +318,130 @@ func TestParseGitProtocol(t *testing.T) {
 		if got := parseGitProtocol(tt.in); got != tt.want {
 			t.Errorf("parseGitProtocol(%q) = %d, want %d", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestAuthorizeRejectsInfoRefs(t *testing.T) {
+	h := &recordHandler{}
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		return wire.ErrUnauthorized
+	})
+	ts := newTestServerWithAuth(h, auth)
+	defer ts.Close()
+
+	for _, version := range []string{"", "version=2"} {
+		req, _ := http.NewRequest("GET", ts.URL+"/org/repo.git/info/refs?service=git-upload-pack", nil)
+		if version != "" {
+			req.Header.Set("Git-Protocol", version)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("Git-Protocol=%q: status = %d, want 403", version, resp.StatusCode)
+		}
+	}
+	if h.advertised {
+		t.Fatal("handler was reached despite an unauthorized session")
+	}
+}
+
+func TestAuthorizeRejectsPost(t *testing.T) {
+	h := &recordHandler{}
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		return wire.ErrUnauthorized
+	})
+	ts := newTestServerWithAuth(h, auth)
+	defer ts.Close()
+
+	oid := strings.Repeat("a", 40)
+	body := pkt("want "+oid+"\n", "FLUSH", "done\n")
+	resp, err := http.Post(ts.URL+"/org/repo.git/git-upload-pack", "application/x-git-upload-pack-request", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", resp.StatusCode)
+	}
+	if h.uploadPack != nil {
+		t.Fatal("handler was reached despite an unauthorized session")
+	}
+}
+
+func TestAuthorizeSeesSessionMetadata(t *testing.T) {
+	h := &recordHandler{}
+	var gotService, gotRepo, gotUser string
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		gotService, gotRepo, gotUser = s.Service, s.Repo, s.User
+		return nil
+	})
+	ts := newTestServerWithAuth(h, auth)
+	defer ts.Close()
+
+	req, _ := http.NewRequest("GET", ts.URL+"/org/repo.git/info/refs?service=git-upload-pack", nil)
+	req.SetBasicAuth("carol", "pw")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 for an allowed session", resp.StatusCode)
+	}
+	if gotService != wire.ServiceUploadPack || gotRepo != "org/repo.git" || gotUser != "carol" {
+		t.Fatalf("authorizer saw service=%q repo=%q user=%q", gotService, gotRepo, gotUser)
+	}
+}
+
+func TestAuthorizeRejectsPostBeforeBodyDecode(t *testing.T) {
+	// An unauthorized gzip POST must be rejected with 403 before the body is
+	// decoded, even when the gzip stream is malformed (which would otherwise be
+	// a 400). This proves the gate runs before any body touch.
+	h := &recordHandler{}
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		return wire.ErrUnauthorized
+	})
+	ts := newTestServerWithAuth(h, auth)
+	defer ts.Close()
+
+	req, _ := http.NewRequest("POST", ts.URL+"/org/repo.git/git-upload-pack",
+		strings.NewReader("this is not valid gzip"))
+	req.Header.Set("Content-Encoding", "gzip")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (auth before body decode)", resp.StatusCode)
+	}
+	if h.uploadPack != nil {
+		t.Fatal("handler was reached despite an unauthorized session")
+	}
+}
+
+func TestAuthorizeInternalErrorIs500(t *testing.T) {
+	h := &recordHandler{}
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		return context.DeadlineExceeded // not ErrUnauthorized
+	})
+	ts := newTestServerWithAuth(h, auth)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/org/repo.git/info/refs?service=git-upload-pack")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500", resp.StatusCode)
+	}
+	// The internal detail must not leak into the body.
+	body, _ := io.ReadAll(resp.Body)
+	if strings.Contains(string(body), "deadline") {
+		t.Fatalf("internal error detail leaked: %q", body)
 	}
 }

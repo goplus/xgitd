@@ -93,6 +93,11 @@ func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo 
 		Out:        &body,
 	}
 
+	if err := h.Server.Authorize(r.Context(), s); err != nil {
+		writeAuthError(w, err)
+		return
+	}
+
 	// The service banner is a pkt-line "# service=<name>\n" followed by a
 	// flush, then the advertisement body.
 	if err := writeServiceBanner(&body, service); err != nil {
@@ -133,13 +138,6 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 		return
 	}
 
-	body, err := requestBody(r)
-	if err != nil {
-		http.Error(w, "bad request body", http.StatusBadRequest)
-		return
-	}
-	defer body.Close()
-
 	version := parseGitProtocol(r.Header.Get("Git-Protocol"))
 
 	setNoCache(w)
@@ -155,9 +153,23 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 		Version:    version,
 		User:       basicAuthUser(r),
 		RemoteAddr: r.RemoteAddr,
-		In:         body,
 		Out:        rw,
 	}
+
+	// Authorize before the body is touched, so an unauthorized client causes no
+	// decode work (not even the gzip header) and always gets a clean status.
+	if err := h.Server.Authorize(r.Context(), s); err != nil {
+		writeAuthError(w, err)
+		return
+	}
+
+	body, err := requestBody(r)
+	if err != nil {
+		http.Error(w, "bad request body", http.StatusBadRequest)
+		return
+	}
+	defer body.Close()
+	s.In = body
 
 	if err := h.Server.Dispatch(r.Context(), s); err != nil {
 		h.reportPostError(rw, err)
@@ -224,4 +236,15 @@ func setNoCache(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Expires", "Fri, 01 Jan 1980 00:00:00 GMT")
 	w.Header().Set("Pragma", "no-cache")
+}
+
+// writeAuthError reports an authorization failure. ErrUnauthorized becomes a 403
+// Forbidden; any other error from the authorizer is an internal failure and is
+// reported generically so authorization internals do not leak to the client.
+func writeAuthError(w http.ResponseWriter, err error) {
+	if errors.Is(err, wire.ErrUnauthorized) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	http.Error(w, "internal server error", http.StatusInternalServerError)
 }

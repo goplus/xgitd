@@ -25,6 +25,10 @@ type Server struct {
 	// Capabilities is the static v2 capability advertisement. When it is the
 	// zero value, DefaultCapabilityAdvertisement is used.
 	Capabilities protocol.CapabilityAdvertisement
+	// Authorizer, when set, gates every session: the transport calls
+	// [Server.Authorize] once before advertising or dispatching, and a rejected
+	// session never reaches the Handler. When nil, every session is allowed.
+	Authorizer Authorizer
 }
 
 // WriteV2Advertisement writes the static v2 capability advertisement to s.Out.
@@ -134,11 +138,16 @@ func WriteErrorFor(w io.Writer, err error) error {
 }
 
 // errorMessage maps a handler error to the client-facing message. It keeps the
-// "not implemented" case recognizable and hides the detail of any other error
-// behind a generic message, since internal errors should not leak to clients.
+// "not implemented" and "unauthorized" cases recognizable and hides the detail
+// of any other error behind a generic message, since internal errors should not
+// leak to clients.
 func errorMessage(err error) string {
-	if errors.Is(err, ErrNotImplemented) {
+	switch {
+	case errors.Is(err, ErrNotImplemented):
 		return "not implemented"
+	case errors.Is(err, ErrUnauthorized):
+		return "unauthorized"
+	default:
+		return "internal server error"
 	}
-	return "internal server error"
 }
