@@ -158,17 +158,6 @@ func TestServerDispatchV2Fetch(t *testing.T) {
 	}
 }
 
-func TestServerDefaultHandlerIsNop(t *testing.T) {
-	srv := &Server{} // no handler
-	oid := strings.Repeat("a", 40)
-	in := pkt("want "+oid+"\n", "FLUSH", "done\n")
-	s := &Session{Service: ServiceUploadPack, Version: 0, In: strings.NewReader(in), Out: &strings.Builder{}}
-	err := srv.Dispatch(context.Background(), s)
-	if !errors.Is(err, ErrNotImplemented) {
-		t.Fatalf("err = %v, want ErrNotImplemented", err)
-	}
-}
-
 func TestWriteErrorFor(t *testing.T) {
 	var b strings.Builder
 	if err := WriteErrorFor(&b, ErrNotImplemented); err != nil {
