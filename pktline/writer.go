@@ -16,6 +16,12 @@ func NewWriter(w io.Writer) *Writer {
 	return &Writer{w: w}
 }
 
+// Raw returns the underlying writer, for payloads that must bypass pkt-line
+// framing — most notably a v0 upload-pack packfile sent without side-band, which
+// follows the pkt-line negotiation as a raw byte stream. Interleaving Raw writes
+// with framed writes on the same Writer is the caller's responsibility.
+func (w *Writer) Raw() io.Writer { return w.w }
+
 // writeControl writes a special zero-payload pkt-line.
 func (w *Writer) writeControl(length int) error {
 	var hdr [HeaderLen]byte

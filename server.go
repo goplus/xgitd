@@ -57,7 +57,10 @@ func (srv *Server) WriteV2Advertisement(s *Session) error {
 // The flow depends on s.Service and s.Version:
 //
 //   - v2 (either service): read one command frame from s.In and route to
-//     LsRefs, Fetch, or ObjectInfo.
+//     LsRefs, Fetch, or ObjectInfo. This is the stateless shape used by HTTP,
+//     where each command arrives in its own POST. A stateful transport that may
+//     receive several v2 commands on one connection uses [Server.DispatchV2]
+//     instead.
 //   - v0 git-upload-pack: decode a negotiation round and call UploadPack.
 //   - v0 git-receive-pack: decode the push and call ReceivePack.
 //
@@ -65,7 +68,11 @@ func (srv *Server) WriteV2Advertisement(s *Session) error {
 // [Server.AdvertiseRefs]); Dispatch covers the request body that follows.
 func (srv *Server) Dispatch(ctx context.Context, s *Session) error {
 	if s.Version == protocol.VersionV2 {
-		return srv.dispatchV2(ctx, s)
+		cmd, req, err := protocol.DecodeV2(s.In)
+		if err != nil {
+			return err
+		}
+		return srv.routeV2(ctx, s, cmd, req)
 	}
 	switch s.Service {
 	case ServiceUploadPack:
@@ -85,17 +92,37 @@ func (srv *Server) Dispatch(ctx context.Context, s *Session) error {
 	}
 }
 
+// DispatchV2 handles a v2 session on a stateful connection: it reads and routes
+// successive commands from s.In until the client ends the sequence with a
+// flush-pkt. This is what SSH needs, since a v2 client issues several commands
+// (for example ls-refs then fetch) on the same channel.
+//
+// Each command's response is written to s.Out by the handler as it is routed,
+// so the client sees the full request/response interleaving the protocol
+// expects.
+func (srv *Server) DispatchV2(ctx context.Context, s *Session) error {
+	dec := protocol.NewV2Decoder(s.In)
+	for {
+		cmd, req, err := dec.Next()
+		if errors.Is(err, protocol.ErrNoMoreCommands) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := srv.routeV2(ctx, s, cmd, req); err != nil {
+			return err
+		}
+	}
+}
+
 // AdvertiseRefs invokes the handler's v0 reference advertisement.
 func (srv *Server) AdvertiseRefs(ctx context.Context, s *Session) error {
 	return srv.handler().AdvertiseRefs(ctx, s)
 }
 
-// dispatchV2 reads one v2 command frame and routes it.
-func (srv *Server) dispatchV2(ctx context.Context, s *Session) error {
-	cmd, req, err := protocol.DecodeV2(s.In)
-	if err != nil {
-		return err
-	}
+// routeV2 routes a single decoded v2 command to the handler.
+func (srv *Server) routeV2(ctx context.Context, s *Session, cmd string, req any) error {
 	h := srv.handler()
 	switch r := req.(type) {
 	case *protocol.LsRefsRequest:

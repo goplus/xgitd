@@ -167,13 +167,14 @@ func (t *Transport) runExec(ch gossh.Channel, cmdline, gitProtocol, user, remote
 //
 // For v0 upload-pack and receive-pack, SSH begins with a ref advertisement
 // before the client sends its request. For v2, the server advertises its
-// capabilities first; the client then sends one command.
+// capabilities first; the client then sends one or more commands on the same
+// channel (for example ls-refs then fetch), which DispatchV2 handles as a loop.
 func (t *Transport) serve(ctx context.Context, s *xgitd.Session) error {
 	if s.Version == 2 {
 		if err := t.Server.WriteV2Advertisement(s); err != nil {
 			return err
 		}
-		return t.Server.Dispatch(ctx, s)
+		return t.Server.DispatchV2(ctx, s)
 	}
 	if err := t.Server.AdvertiseRefs(ctx, s); err != nil {
 		return err
