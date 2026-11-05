@@ -3,14 +3,7 @@
 `xgitd` is a lightweight Git server skeleton written in Go. It accepts
 connections over **SSH** and **Smart HTTP**, speaks Git wire protocol **v0** and
 **v2**, decodes every request into typed Go values, and hands each one to a
-single [`Handler`](handler.go) interface whose default implementation does
-nothing.
-
-This is milestone one: get the protocol surface right and testable. There is no
-object storage, no pack parsing, no ref updates, and no authorization policy. A
-push's packfile is exposed as an opaque `io.Reader`; a fetch response is whatever
-the handler writes. Later milestones can plug a real backend behind the same
-`Handler` without touching any wire-level code.
+single [`Handler`](handler.go) interface.
 
 ## Package layout
 

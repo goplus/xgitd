@@ -1,7 +1,6 @@
 // Package xgitd is a lightweight Git server skeleton: it decodes every
 // supported Git wire-protocol request into typed Go values and dispatches to a
-// single [Handler] interface, whose default implementation ([NopHandler]) does
-// nothing.
+// single [Handler] interface.
 //
 // The design deliberately stops at the wire. There is no object storage, no
 // pack parsing, no ref updates, and no authorization policy. A push's packfile

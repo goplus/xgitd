@@ -31,10 +31,6 @@ type Transport struct {
 	Config *gossh.ServerConfig
 }
 
-// fingerprintKey is the context key under which a successful public-key auth
-// stashes the client's key fingerprint, so HandleConn can surface it.
-type fingerprintKey struct{}
-
 // Serve accepts connections from l until it returns an error (for example
 // because l was closed) and handles each in its own goroutine.
 func (t *Transport) Serve(l net.Listener) error {

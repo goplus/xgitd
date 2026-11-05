@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"sort"
 	"strings"
 )
 
@@ -99,11 +98,4 @@ func (c *Capabilities) ObjectFormat() string {
 		return v
 	}
 	return ObjectFormatSHA1
-}
-
-// sortedNames returns capability names sorted, for deterministic test output.
-func (c *Capabilities) sortedNames() []string {
-	out := c.Names()
-	sort.Strings(out)
-	return out
 }
