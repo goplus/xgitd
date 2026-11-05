@@ -23,15 +23,15 @@ type CapabilityAdvertisement struct {
 	// Fetch advertises the fetch command. The FetchFeatures are appended as its
 	// value, space-separated.
 	Fetch bool
+	// ObjectInfo advertises the object-info command.
+	ObjectInfo bool
 	// FetchFeatures are the sub-features advertised on the fetch line (for
 	// example "shallow", "filter", "wait-for-done", "sideband-all").
 	FetchFeatures []string
-	// ObjectInfo advertises the object-info command.
-	ObjectInfo bool
 }
 
 // DefaultAgent is the agent string advertised when none is configured.
-const DefaultAgent = "git/xgitd"
+const DefaultAgent = "xgitd"
 
 // DefaultCapabilityAdvertisement returns the default v2 advertisement: ls-refs,
 // fetch (with shallow/filter), and object-info, over SHA-1.

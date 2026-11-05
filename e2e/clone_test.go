@@ -80,7 +80,7 @@ func (h *repoHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error 
 	return wire.WriteRefAdvertisementV0(s, wire.RefAdvertisementV0{
 		Service:      s.Service,
 		Refs:         refs,
-		Capabilities: []string{"side-band-64k", "ofs-delta", "agent=git/xgitd"},
+		Capabilities: []string{"side-band-64k", "ofs-delta", "agent=xgitd"},
 	})
 }
 

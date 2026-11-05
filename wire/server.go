@@ -27,14 +27,6 @@ type Server struct {
 	Capabilities protocol.CapabilityAdvertisement
 }
 
-// handler returns the configured handler or a NopHandler.
-func (srv *Server) handler() Handler {
-	if srv.Handler == nil {
-		return BaseHandler{}
-	}
-	return srv.Handler
-}
-
 // advertisement returns the configured advertisement or the default.
 func (srv *Server) advertisement() protocol.CapabilityAdvertisement {
 	// A zero CapabilityAdvertisement advertises nothing, which is never useful,
@@ -80,13 +72,13 @@ func (srv *Server) Dispatch(ctx context.Context, s *Session) error {
 		if err != nil {
 			return err
 		}
-		return srv.handler().UploadPack(ctx, s, req)
+		return srv.Handler.UploadPack(ctx, s, req)
 	case ServiceReceivePack:
 		req, err := protocol.DecodeReceivePackV0(s.In)
 		if err != nil {
 			return err
 		}
-		return srv.handler().ReceivePack(ctx, s, req)
+		return srv.Handler.ReceivePack(ctx, s, req)
 	default:
 		return fmt.Errorf("xgitd: unsupported service %q", s.Service)
 	}
@@ -118,12 +110,12 @@ func (srv *Server) DispatchV2(ctx context.Context, s *Session) error {
 
 // AdvertiseRefs invokes the handler's v0 reference advertisement.
 func (srv *Server) AdvertiseRefs(ctx context.Context, s *Session) error {
-	return srv.handler().AdvertiseRefs(ctx, s)
+	return srv.Handler.AdvertiseRefs(ctx, s)
 }
 
 // routeV2 routes a single decoded v2 command to the handler.
 func (srv *Server) routeV2(ctx context.Context, s *Session, cmd string, req any) error {
-	h := srv.handler()
+	h := srv.Handler
 	switch r := req.(type) {
 	case *protocol.LsRefsRequest:
 		return h.LsRefs(ctx, s, r)

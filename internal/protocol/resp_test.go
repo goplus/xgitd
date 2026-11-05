@@ -46,7 +46,7 @@ func TestRefAdvertisementV0NonEmpty(t *testing.T) {
 			{Name: "refs/heads/main", ID: oidA},
 			{Name: "refs/tags/v1", ID: oidB, PeeledID: oidC},
 		},
-		Capabilities: []string{"side-band-64k", "ofs-delta", "agent=git/xgitd"},
+		Capabilities: []string{"side-band-64k", "ofs-delta", "agent=xgitd"},
 	}
 	var buf bytes.Buffer
 	if err := adv.WriteV0(&buf); err != nil {
@@ -82,7 +82,7 @@ func TestRefAdvertisementV0NonEmpty(t *testing.T) {
 func TestRefAdvertisementV0Empty(t *testing.T) {
 	adv := RefAdvertisementV0{
 		Service:      "git-upload-pack",
-		Capabilities: []string{"side-band-64k", "agent=git/xgitd"},
+		Capabilities: []string{"side-band-64k", "agent=xgitd"},
 	}
 	var buf bytes.Buffer
 	if err := adv.WriteV0(&buf); err != nil {

@@ -1,5 +1,8 @@
 # xgitd
 
+[![Build Status](https://github.com/goplus/xgitd/actions/workflows/go.yml/badge.svg)](https://github.com/goplus/xgitd/actions/workflows/go.yml)
+[![Coverage Status](https://codecov.io/gh/goplus/xgitd/branch/main/graph/badge.svg)](https://codecov.io/gh/goplus/xgitd)
+
 xgitd is a lightweight Git server skeleton written in Go. It accepts connections
 over **SSH** and **Smart HTTP**, speaks Git wire protocol **v0** and **v2**.
 
