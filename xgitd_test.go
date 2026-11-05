@@ -189,3 +189,106 @@ func TestWriteErrorFor(t *testing.T) {
 		t.Fatalf("output = %q", b.String())
 	}
 }
+
+// TestResponseHelpersWriteToSessionOut verifies that the re-exported response
+// helpers target Session.Out, so a handler can use them with only the Session
+// it is given.
+func TestResponseHelpersWriteToSessionOut(t *testing.T) {
+	newSession := func(b *strings.Builder) *Session { return &Session{Out: b} }
+
+	t.Run("ref-advertisement", func(t *testing.T) {
+		var b strings.Builder
+		err := WriteRefAdvertisementV0(newSession(&b), RefAdvertisementV0{
+			Refs:         []Ref{{Name: "refs/heads/main", ID: strings.Repeat("a", 40)}},
+			Capabilities: []string{"ofs-delta"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "refs/heads/main") || !strings.HasSuffix(b.String(), "0000") {
+			t.Fatalf("advertisement = %q", b.String())
+		}
+	})
+
+	t.Run("ls-refs", func(t *testing.T) {
+		var b strings.Builder
+		err := WriteLsRefs(newSession(&b), &LsRefsRequest{}, []Ref{{Name: "HEAD", ID: strings.Repeat("a", 40)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "HEAD") {
+			t.Fatalf("ls-refs = %q", b.String())
+		}
+	})
+
+	t.Run("report-status", func(t *testing.T) {
+		var b strings.Builder
+		err := WriteReportStatus(newSession(&b), ReportStatus{
+			UnpackOK: true,
+			Refs:     []RefStatus{{Ref: "refs/heads/main", OK: true}},
+		}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "unpack ok") || !strings.Contains(b.String(), "ok refs/heads/main") {
+			t.Fatalf("report-status = %q", b.String())
+		}
+	})
+
+	t.Run("object-info", func(t *testing.T) {
+		var b strings.Builder
+		err := WriteObjectInfo(newSession(&b), &ObjectInfoRequest{Attributes: []string{"size"}},
+			[]ObjectInfoEntry{{OID: strings.Repeat("a", 40), Size: 7}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "size") || !strings.Contains(b.String(), " 7\n") {
+			t.Fatalf("object-info = %q", b.String())
+		}
+	})
+
+	t.Run("upload-pack-responder", func(t *testing.T) {
+		var b strings.Builder
+		r := NewUploadPackResponder(newSession(&b), false)
+		if err := r.NAK(); err != nil {
+			t.Fatal(err)
+		}
+		w, finish := r.PackWriter()
+		if _, err := w.Write([]byte("PACK")); err != nil {
+			t.Fatal(err)
+		}
+		if err := finish(); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "NAK") || !strings.HasSuffix(b.String(), "PACK") {
+			t.Fatalf("upload-pack response = %q", b.String())
+		}
+	})
+
+	t.Run("fetch-responder", func(t *testing.T) {
+		var b strings.Builder
+		r := NewFetchResponder(newSession(&b))
+		w, finish, err := r.PackSection()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("PACK")); err != nil {
+			t.Fatal(err)
+		}
+		if err := finish(); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), "packfile") {
+			t.Fatalf("fetch response = %q", b.String())
+		}
+	})
+}
+
+func TestZeroIDFor(t *testing.T) {
+	if len(ZeroIDFor("sha256")) != 64 {
+		t.Fatal("sha256 zero id should be 64 hex chars")
+	}
+	if ZeroIDFor("") != ZeroID {
+		t.Fatal("default zero id mismatch")
+	}
+}

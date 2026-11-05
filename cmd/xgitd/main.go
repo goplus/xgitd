@@ -14,6 +14,12 @@
 //	GIT_SSH_COMMAND='ssh -p 2222' git ls-remote git@localhost:org/repo.git
 //
 // The git commands are expected to fail; the server logs the decoded request.
+//
+// A handler that actually responds uses the response helpers on the xgitd
+// package — WriteRefAdvertisementV0, NewUploadPackResponder, WriteLsRefs,
+// NewFetchResponder, WriteObjectInfo, and WriteReportStatus — to frame its
+// output on the wire. The e2e package contains a worked example (a handler
+// backed by a real repository that git can clone from) in clone_test.go.
 package main
 
 import (
