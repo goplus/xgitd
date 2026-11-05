@@ -443,7 +443,7 @@ func TestDecodeV2UnknownCommand(t *testing.T) {
 
 func TestCapabilityAdvertisementDefault(t *testing.T) {
 	var buf bytes.Buffer
-	if err := DefaultCapabilityAdvertisement().WriteV2(&buf); err != nil {
+	if err := (CapabilityAdvertisement{}).WriteV2(&buf); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	out := buf.String()
@@ -462,7 +462,7 @@ func TestCapabilityAdvertisementStartsWithVersionLine(t *testing.T) {
 	// Per the protocol-v2 grammar the advertisement must begin with a
 	// "version 2" pkt-line; git rejects it otherwise.
 	var buf bytes.Buffer
-	if err := DefaultCapabilityAdvertisement().WriteV2(&buf); err != nil {
+	if err := (CapabilityAdvertisement{}).WriteV2(&buf); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	// "version 2\n" is 10 bytes; with the 4-byte length prefix the first

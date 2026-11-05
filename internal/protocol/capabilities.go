@@ -22,7 +22,7 @@ type Capabilities struct {
 // ignored.
 func ParseCapabilities(s string) *Capabilities {
 	c := &Capabilities{values: make(map[string]string)}
-	for _, tok := range strings.Fields(s) {
+	for tok := range strings.FieldsSeq(s) {
 		c.add(tok)
 	}
 	return c

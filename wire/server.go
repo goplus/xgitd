@@ -27,21 +27,11 @@ type Server struct {
 	Capabilities protocol.CapabilityAdvertisement
 }
 
-// advertisement returns the configured advertisement or the default.
-func (srv *Server) advertisement() protocol.CapabilityAdvertisement {
-	// A zero CapabilityAdvertisement advertises nothing, which is never useful,
-	// so treat "no commands advertised" as "use the default".
-	if !srv.Capabilities.LsRefs && !srv.Capabilities.Fetch && !srv.Capabilities.ObjectInfo {
-		return protocol.DefaultCapabilityAdvertisement()
-	}
-	return srv.Capabilities
-}
-
 // WriteV2Advertisement writes the static v2 capability advertisement to s.Out.
 // Transports call it during discovery so a v2 client knows which commands it
 // may issue.
 func (srv *Server) WriteV2Advertisement(s *Session) error {
-	return srv.advertisement().WriteV2(s.Out)
+	return srv.Capabilities.WriteV2(s.Out)
 }
 
 // Dispatch decodes the request described by s and routes it to the handler.

@@ -18,13 +18,12 @@ type CapabilityAdvertisement struct {
 	// ObjectFormats lists the advertised object-format values (e.g. "sha1",
 	// "sha256").
 	ObjectFormats []string
-	// LsRefs advertises the ls-refs command.
-	LsRefs bool
-	// Fetch advertises the fetch command. The FetchFeatures are appended as its
-	// value, space-separated.
-	Fetch bool
-	// ObjectInfo advertises the object-info command.
-	ObjectInfo bool
+	// NoLsRefs disables the ls-refs command advertisement.
+	NoLsRefs bool
+	// NoObjectInfo disables the object-info command advertisement.
+	NoObjectInfo bool
+	// NoFetch disables the fetch command advertisement.
+	NoFetch bool
 	// FetchFeatures are the sub-features advertised on the fetch line (for
 	// example "shallow", "filter", "wait-for-done", "sideband-all").
 	FetchFeatures []string
@@ -32,23 +31,6 @@ type CapabilityAdvertisement struct {
 
 // DefaultAgent is the agent string advertised when none is configured.
 const DefaultAgent = "xgitd"
-
-// DefaultCapabilityAdvertisement returns the default v2 advertisement: ls-refs,
-// fetch (with shallow/filter), and object-info, over SHA-1.
-//
-// The object-format capability advertises a single hash algorithm, since that
-// is a property of the repository being served; it defaults to SHA-1 here
-// because this skeleton has no backend to report the real one.
-func DefaultCapabilityAdvertisement() CapabilityAdvertisement {
-	return CapabilityAdvertisement{
-		Agent:         DefaultAgent,
-		ObjectFormats: []string{ObjectFormatSHA1},
-		LsRefs:        true,
-		Fetch:         true,
-		FetchFeatures: []string{"shallow", "filter", "wait-for-done"},
-		ObjectInfo:    true,
-	}
-}
 
 // Lines returns the advertisement body as an ordered list of pkt-line payloads
 // (without the trailing newline Git conventionally adds, which WriteV2 adds).
@@ -60,21 +42,26 @@ func (a CapabilityAdvertisement) Lines() []string {
 	if agent == "" {
 		agent = DefaultAgent
 	}
-	lines := []string{"version 2", "agent=" + agent}
-	if len(a.ObjectFormats) > 0 {
-		lines = append(lines, "object-format="+strings.Join(a.ObjectFormats, " "))
+	objFormats := a.ObjectFormats
+	if len(objFormats) == 0 {
+		objFormats = []string{ObjectFormatSHA1}
 	}
-	if a.LsRefs {
+	lines := make([]string, 3, 6)
+	lines[0] = "version 2"
+	lines[1] = "agent=" + agent
+	lines[2] = "object-format=" + strings.Join(objFormats, " ")
+	if !a.NoLsRefs {
 		lines = append(lines, "ls-refs")
 	}
-	if a.Fetch {
-		line := "fetch"
-		if len(a.FetchFeatures) > 0 {
-			line += "=" + strings.Join(a.FetchFeatures, " ")
+	if !a.NoFetch {
+		features := a.FetchFeatures
+		if features == nil {
+			features = []string{"shallow", "filter", "wait-for-done"}
 		}
+		line := "fetch=" + strings.Join(features, " ")
 		lines = append(lines, line)
 	}
-	if a.ObjectInfo {
+	if !a.NoObjectInfo {
 		lines = append(lines, "object-info")
 	}
 	return lines
