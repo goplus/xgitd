@@ -134,14 +134,16 @@ func WriteError(w io.Writer, msg string) error {
 // It keeps the "not implemented" case recognizable and hides any other error
 // behind a generic message so internal detail does not leak to clients.
 func WriteErrorFor(w io.Writer, err error) error {
-	return WriteError(w, errorMessage(err))
+	return WriteError(w, ClientErrorMessage(err))
 }
 
-// errorMessage maps a handler error to the client-facing message. It keeps the
-// "not implemented" and "unauthorized" cases recognizable and hides the detail
-// of any other error behind a generic message, since internal errors should not
-// leak to clients.
-func errorMessage(err error) string {
+// ClientErrorMessage maps an error to the client-facing message that transports
+// surface to the client. It keeps the "not implemented" and "unauthorized" cases
+// recognizable and hides the detail of any other error behind a generic message,
+// since internal errors should not leak to clients. Transports use it as the
+// single source of truth for this wording (for example, the Smart HTTP 403 body
+// and the SSH ERR pkt-line share it).
+func ClientErrorMessage(err error) string {
 	switch {
 	case errors.Is(err, ErrNotImplemented):
 		return "not implemented"

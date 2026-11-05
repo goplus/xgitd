@@ -159,6 +159,12 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 	// Authorize before the body is touched, so an unauthorized client causes no
 	// decode work (not even the gzip header) and always gets a clean status.
 	if err := h.Server.Authorize(r.Context(), s); err != nil {
+		// Drain a bounded prefix of the raw (still-undecoded) body before
+		// replying, so a rejected request can keep its connection alive. Go's
+		// server only auto-drains up to maxDrainOnReject (256 KiB) before forcing
+		// Connection: close, and a receive-pack body routinely exceeds that.
+		// Draining the raw bytes keeps the "no decode work" property.
+		_, _ = io.CopyN(io.Discard, r.Body, maxDrainOnReject)
 		writeAuthError(w, err)
 		return
 	}
@@ -238,13 +244,22 @@ func setNoCache(w http.ResponseWriter) {
 	w.Header().Set("Pragma", "no-cache")
 }
 
+// maxDrainOnReject bounds how much of a rejected request's body is drained to
+// keep the connection reusable. It mirrors net/http's own maxPostHandlerReadBytes
+// (256 KiB): draining up to this much lets small-to-moderate bodies keep the
+// connection alive, while a larger body is abandoned (the connection closes)
+// rather than paying to read an unbounded upload we are discarding anyway.
+const maxDrainOnReject = 256 << 10
+
 // writeAuthError reports an authorization failure. ErrUnauthorized becomes a 403
 // Forbidden; any other error from the authorizer is an internal failure and is
-// reported generically so authorization internals do not leak to the client.
+// reported generically so authorization internals do not leak to the client. The
+// body reuses [wire.ClientErrorMessage] so SSH and Smart HTTP use one vocabulary
+// for the same sentinel.
 func writeAuthError(w http.ResponseWriter, err error) {
 	if errors.Is(err, wire.ErrUnauthorized) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		http.Error(w, wire.ClientErrorMessage(err), http.StatusForbidden)
 		return
 	}
-	http.Error(w, "internal server error", http.StatusInternalServerError)
+	http.Error(w, wire.ClientErrorMessage(err), http.StatusInternalServerError)
 }

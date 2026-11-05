@@ -366,6 +366,12 @@ func TestAuthorizeRejectsPost(t *testing.T) {
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", resp.StatusCode)
 	}
+	// The 403 body reuses wire.ClientErrorMessage so the wording matches the SSH
+	// ERR pkt-line for the same sentinel.
+	gotBody, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(gotBody), "unauthorized") {
+		t.Fatalf("403 body = %q, want it to contain %q", gotBody, "unauthorized")
+	}
 	if h.uploadPack != nil {
 		t.Fatal("handler was reached despite an unauthorized session")
 	}

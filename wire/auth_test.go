@@ -62,15 +62,15 @@ func TestAuthorizeFuncImplementsAuthorizer(t *testing.T) {
 	}
 }
 
-func TestErrorMessageUnauthorized(t *testing.T) {
-	if got := errorMessage(ErrUnauthorized); got != "unauthorized" {
-		t.Fatalf("errorMessage(ErrUnauthorized) = %q, want %q", got, "unauthorized")
+func TestClientErrorMessageUnauthorized(t *testing.T) {
+	if got := ClientErrorMessage(ErrUnauthorized); got != "unauthorized" {
+		t.Fatalf("ClientErrorMessage(ErrUnauthorized) = %q, want %q", got, "unauthorized")
 	}
-	if got := errorMessage(fmt.Errorf("denied: %w", ErrUnauthorized)); got != "unauthorized" {
-		t.Fatalf("errorMessage(wrapped) = %q, want %q", got, "unauthorized")
+	if got := ClientErrorMessage(fmt.Errorf("denied: %w", ErrUnauthorized)); got != "unauthorized" {
+		t.Fatalf("ClientErrorMessage(wrapped) = %q, want %q", got, "unauthorized")
 	}
 	// A non-sentinel error must not leak its detail.
-	if got := errorMessage(errors.New("secret policy detail")); got != "internal server error" {
-		t.Fatalf("errorMessage(other) = %q, want generic", got)
+	if got := ClientErrorMessage(errors.New("secret policy detail")); got != "internal server error" {
+		t.Fatalf("ClientErrorMessage(other) = %q, want generic", got)
 	}
 }
