@@ -97,6 +97,7 @@ type FetchRequest struct {
 	Haves    []ObjectID // "have <oid>"
 	Shallows []ObjectID // "shallow <oid>"
 
+	Filter      string // "filter <spec>"
 	Done        bool   // "done"
 	ThinPack    bool   // "thin-pack"
 	NoProgress  bool   // "no-progress"
@@ -104,10 +105,9 @@ type FetchRequest struct {
 	OfsDelta    bool   // "ofs-delta"
 	SidebandAll bool   // "sideband-all"
 	WaitForDone bool   // "wait-for-done"
-	Filter      string // "filter <spec>"
 
-	Deepen         int      // "deepen <n>"
 	DeepenRelative bool     // "deepen-relative"
+	Deepen         int      // "deepen <n>"
 	DeepenSince    int64    // "deepen-since <unix-time>"
 	DeepenNot      []string // "deepen-not <ref>"
 
