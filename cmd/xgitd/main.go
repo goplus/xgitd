@@ -32,50 +32,50 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"github.com/goplus/xgitd"
 	xhttp "github.com/goplus/xgitd/transport/http"
 	xssh "github.com/goplus/xgitd/transport/ssh"
+	"github.com/goplus/xgitd/wire"
 )
 
 // logHandler embeds NopHandler and logs each decoded request before deferring
 // to the empty implementation (which returns ErrNotImplemented).
 type logHandler struct {
-	xgitd.NopHandler
+	wire.NopHandler
 }
 
-func (logHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) error {
+func (logHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error {
 	log.Printf("advertise-refs transport=%s service=%s repo=%s version=%d user=%q",
 		s.Transport, s.Service, s.Repo, s.Version, s.User)
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
-func (logHandler) UploadPack(ctx context.Context, s *xgitd.Session, req *xgitd.UploadPackRequest) error {
+func (logHandler) UploadPack(ctx context.Context, s *wire.Session, req *wire.UploadPackRequest) error {
 	log.Printf("upload-pack repo=%s wants=%d haves=%d done=%v caps=%v",
 		s.Repo, len(req.Wants), len(req.Haves), req.Done, req.Capabilities.Names())
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
-func (logHandler) ReceivePack(ctx context.Context, s *xgitd.Session, req *xgitd.ReceivePackRequest) error {
+func (logHandler) ReceivePack(ctx context.Context, s *wire.Session, req *wire.ReceivePackRequest) error {
 	log.Printf("receive-pack repo=%s commands=%d push-options=%v has-pack=%v",
 		s.Repo, len(req.Commands), req.PushOptions, req.Packfile != nil)
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
-func (logHandler) LsRefs(ctx context.Context, s *xgitd.Session, req *xgitd.LsRefsRequest) error {
+func (logHandler) LsRefs(ctx context.Context, s *wire.Session, req *wire.LsRefsRequest) error {
 	log.Printf("ls-refs repo=%s prefixes=%v symrefs=%v peel=%v",
 		s.Repo, req.RefPrefixes, req.Symrefs, req.Peel)
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
-func (logHandler) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
+func (logHandler) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
 	log.Printf("fetch repo=%s wants=%d haves=%d done=%v filter=%q",
 		s.Repo, len(req.Wants), len(req.Haves), req.Done, req.Filter)
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
-func (logHandler) ObjectInfo(ctx context.Context, s *xgitd.Session, req *xgitd.ObjectInfoRequest) error {
+func (logHandler) ObjectInfo(ctx context.Context, s *wire.Session, req *wire.ObjectInfoRequest) error {
 	log.Printf("object-info repo=%s attrs=%v oids=%d", s.Repo, req.Attributes, len(req.OIDs))
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
 func main() {
@@ -83,7 +83,7 @@ func main() {
 	sshAddr := flag.String("ssh", ":2222", "SSH listen address (empty to disable)")
 	flag.Parse()
 
-	srv := &xgitd.Server{Handler: logHandler{}}
+	srv := &wire.Server{Handler: logHandler{}}
 
 	errc := make(chan error, 2)
 
@@ -95,9 +95,7 @@ func main() {
 		cfg := &gossh.ServerConfig{
 			// Accept any key and surface its fingerprint; a real deployment
 			// supplies its own policy.
-			PublicKeyCallback: func(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
-				return xssh.FingerprintAuthCallback()(conn, key)
-			},
+			PublicKeyCallback: xssh.FingerprintAuthCallback,
 		}
 		cfg.AddHostKey(hostKey)
 		tr := &xssh.Transport{Server: srv, Config: cfg}

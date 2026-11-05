@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // parseGitProtocol reads the protocol version from a Git-Protocol header value

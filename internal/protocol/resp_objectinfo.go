@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // ObjectInfoEntry is the server's answer for one requested object in an

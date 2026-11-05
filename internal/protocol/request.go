@@ -1,5 +1,7 @@
 package protocol
 
+import "io"
+
 // ObjectID is a hex-encoded object identifier, as it appears on the wire (40
 // hex chars for SHA-1, 64 for SHA-256). It is kept as a string; the decoders
 // validate its length against the negotiated object-format but do not otherwise
@@ -53,15 +55,11 @@ type ReceivePackRequest struct {
 	// command list. It is nil when the push updated only deletions and the
 	// client sent no pack. The server does not read it; the handler decides
 	// whether to consume it.
-	Packfile Packfile
+	Packfile io.Reader
 
 	// Unknown collects unmodeled command-section lines.
 	Unknown []string
 }
-
-// Packfile is the opaque pack stream of a push. It is an alias for io.Reader to
-// make its role explicit at call sites without importing anything here.
-type Packfile = interface{ Read(p []byte) (int, error) }
 
 // RefUpdate is one ref-update command in a push: change OldID to NewID for Ref.
 // A zero OldID creates a ref; a zero NewID deletes it.

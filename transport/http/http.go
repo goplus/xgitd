@@ -21,18 +21,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 // Handler is an http.Handler that serves the Smart HTTP Git protocol for a
 // given [xgitd.Server].
 type Handler struct {
 	// Server dispatches decoded requests. Required.
-	Server *xgitd.Server
+	Server *wire.Server
 }
 
 // NewHandler returns a [Handler] for srv.
-func NewHandler(srv *xgitd.Server) *Handler {
+func NewHandler(srv *wire.Server) *Handler {
 	return &Handler{Server: srv}
 }
 
@@ -43,10 +43,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasSuffix(path, "/info/refs") && r.Method == http.MethodGet:
 		h.serveInfoRefs(w, r, strings.TrimSuffix(path, "/info/refs"))
-	case strings.HasSuffix(path, "/"+xgitd.ServiceUploadPack) && r.Method == http.MethodPost:
-		h.servePost(w, r, strings.TrimSuffix(path, "/"+xgitd.ServiceUploadPack), xgitd.ServiceUploadPack)
-	case strings.HasSuffix(path, "/"+xgitd.ServiceReceivePack) && r.Method == http.MethodPost:
-		h.servePost(w, r, strings.TrimSuffix(path, "/"+xgitd.ServiceReceivePack), xgitd.ServiceReceivePack)
+	case strings.HasSuffix(path, "/"+wire.ServiceUploadPack) && r.Method == http.MethodPost:
+		h.servePost(w, r, strings.TrimSuffix(path, "/"+wire.ServiceUploadPack), wire.ServiceUploadPack)
+	case strings.HasSuffix(path, "/"+wire.ServiceReceivePack) && r.Method == http.MethodPost:
+		h.servePost(w, r, strings.TrimSuffix(path, "/"+wire.ServiceReceivePack), wire.ServiceReceivePack)
 	default:
 		// Anything else is dumb-HTTP style static access: HEAD, objects/...,
 		// loose/packed object fetches. Reject it clearly.
@@ -67,13 +67,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // 501/500 status instead of a 200 with a half-formed advertisement.
 func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo string) {
 	service := r.URL.Query().Get("service")
-	if service != xgitd.ServiceUploadPack && service != xgitd.ServiceReceivePack {
+	if service != wire.ServiceUploadPack && service != wire.ServiceReceivePack {
 		// No service means a dumb-HTTP client asking for a static info/refs.
 		http.Error(w, "dumb HTTP is not supported", http.StatusForbidden)
 		return
 	}
 
-	repo, err := xgitd.NormalizeRepoPath(rawRepo)
+	repo, err := wire.NormalizeRepoPath(rawRepo)
 	if err != nil {
 		http.Error(w, "invalid repository path", http.StatusBadRequest)
 		return
@@ -82,7 +82,7 @@ func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo 
 	version := parseGitProtocol(r.Header.Get("Git-Protocol"))
 
 	var body bytes.Buffer
-	s := &xgitd.Session{
+	s := &wire.Session{
 		Transport:  "http",
 		Service:    service,
 		Repo:       repo,
@@ -108,7 +108,7 @@ func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo 
 	} else {
 		// v0: the handler produces the real ref advertisement.
 		if err := h.Server.AdvertiseRefs(r.Context(), s); err != nil {
-			if errors.Is(err, xgitd.ErrNotImplemented) {
+			if errors.Is(err, wire.ErrNotImplemented) {
 				http.Error(w, "not implemented", http.StatusNotImplemented)
 				return
 			}
@@ -127,7 +127,7 @@ func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo 
 // the client's command/negotiation stream, and the response is whatever the
 // handler writes.
 func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, service string) {
-	repo, err := xgitd.NormalizeRepoPath(rawRepo)
+	repo, err := wire.NormalizeRepoPath(rawRepo)
 	if err != nil {
 		http.Error(w, "invalid repository path", http.StatusBadRequest)
 		return
@@ -148,7 +148,7 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 	// 200.
 	rw := newResultWriter(w, service)
 
-	s := &xgitd.Session{
+	s := &wire.Session{
 		Transport:  "http",
 		Service:    service,
 		Repo:       repo,
@@ -172,10 +172,10 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 // so the error is surfaced in-band as an ERR pkt-line instead.
 func (h *Handler) reportPostError(rw *resultWriter, err error) {
 	if rw.wroteBody() {
-		_ = xgitd.WriteErrorFor(rw, err)
+		_ = wire.WriteErrorFor(rw, err)
 		return
 	}
-	if errors.Is(err, xgitd.ErrNotImplemented) {
+	if errors.Is(err, wire.ErrNotImplemented) {
 		rw.httpError("not implemented", http.StatusNotImplemented)
 		return
 	}

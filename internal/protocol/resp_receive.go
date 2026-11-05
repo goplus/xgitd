@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // RefStatus is the outcome of one ref update in a push, reported back to the

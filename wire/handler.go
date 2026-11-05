@@ -1,4 +1,4 @@
-// Package xgitd is a lightweight Git server skeleton: it decodes every
+// Package wire is a lightweight Git server skeleton: it decodes every
 // supported Git wire-protocol request into typed Go values and dispatches to a
 // single [Handler] interface.
 //
@@ -8,15 +8,7 @@
 // whatever the handler writes to [Session.Out]. This keeps the protocol surface
 // small, testable, and reusable: later work can plug a real backend behind the
 // same [Handler] without touching any wire-level code.
-//
-// The layers are independent packages, usable on their own:
-//
-//   - [github.com/goplus/xgitd/pktline] — pkt-line framing.
-//   - [github.com/goplus/xgitd/protocol] — version/capability handling and the
-//     v0 and v2 request decoders.
-//   - [github.com/goplus/xgitd/transport/ssh] and
-//     [github.com/goplus/xgitd/transport/http] — the transports.
-package xgitd
+package wire
 
 import (
 	"context"

@@ -216,7 +216,7 @@ func TestDecodeReceivePackV0WithReportStatus(t *testing.T) {
 	if req.Packfile == nil {
 		t.Fatal("packfile = nil, want reader")
 	}
-	got, _ := readAll(req.Packfile)
+	got, _ := io.ReadAll(req.Packfile)
 	if string(got) != packData {
 		t.Fatalf("packfile = %q, want %q", got, packData)
 	}
@@ -473,21 +473,6 @@ func TestCapabilityAdvertisementStartsWithVersionLine(t *testing.T) {
 }
 
 // helpers -------------------------------------------------------------------
-
-func readAll(r Packfile) ([]byte, error) {
-	var buf bytes.Buffer
-	p := make([]byte, 512)
-	for {
-		n, err := r.Read(p)
-		buf.Write(p[:n])
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return buf.Bytes(), nil
-			}
-			return buf.Bytes(), err
-		}
-	}
-}
 
 func asDecodeError(err error, target **DecodeError) bool {
 	return errors.As(err, target)

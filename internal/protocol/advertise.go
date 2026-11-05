@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // CapabilityAdvertisement describes the static v2 capability advertisement the

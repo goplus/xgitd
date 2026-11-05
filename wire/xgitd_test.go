@@ -1,4 +1,4 @@
-package xgitd
+package wire
 
 import (
 	"context"

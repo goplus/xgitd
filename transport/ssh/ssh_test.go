@@ -13,7 +13,7 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 func pkt(items ...string) string {
@@ -39,22 +39,22 @@ func pkt(items ...string) string {
 }
 
 type recordHandler struct {
-	xgitd.NopHandler
+	wire.NopHandler
 	mu          sync.Mutex
 	advertised  bool
-	session     xgitd.Session
-	uploadPack  *xgitd.UploadPackRequest
-	receivePack *xgitd.ReceivePackRequest
-	fetch       *xgitd.FetchRequest
+	session     wire.Session
+	uploadPack  *wire.UploadPackRequest
+	receivePack *wire.ReceivePackRequest
+	fetch       *wire.FetchRequest
 }
 
-func (h *recordHandler) snapshot(s *xgitd.Session) {
+func (h *recordHandler) snapshot(s *wire.Session) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.session = *s
 }
 
-func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) error {
+func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error {
 	h.mu.Lock()
 	h.advertised = true
 	h.mu.Unlock()
@@ -62,21 +62,21 @@ func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) err
 	_, _ = io.WriteString(s.Out, "0000") // minimal v0 advertisement body
 	return nil
 }
-func (h *recordHandler) UploadPack(ctx context.Context, s *xgitd.Session, req *xgitd.UploadPackRequest) error {
+func (h *recordHandler) UploadPack(ctx context.Context, s *wire.Session, req *wire.UploadPackRequest) error {
 	h.mu.Lock()
 	h.uploadPack = req
 	h.mu.Unlock()
 	h.snapshot(s)
 	return nil
 }
-func (h *recordHandler) ReceivePack(ctx context.Context, s *xgitd.Session, req *xgitd.ReceivePackRequest) error {
+func (h *recordHandler) ReceivePack(ctx context.Context, s *wire.Session, req *wire.ReceivePackRequest) error {
 	h.mu.Lock()
 	h.receivePack = req
 	h.mu.Unlock()
 	h.snapshot(s)
 	return nil
 }
-func (h *recordHandler) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
+func (h *recordHandler) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
 	h.mu.Lock()
 	h.fetch = req
 	h.mu.Unlock()
@@ -100,16 +100,14 @@ func newHostKey(t *testing.T) gossh.Signer {
 
 // startServer wires a Transport onto an in-memory listener and returns its
 // address.
-func startServer(t *testing.T, h xgitd.Handler) (net.Listener, *Transport) {
+func startServer(t *testing.T, h wire.Handler) (net.Listener, *Transport) {
 	t.Helper()
 	cfg := &gossh.ServerConfig{
-		PublicKeyCallback: func(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
-			return FingerprintAuthCallback()(conn, key)
-		},
+		PublicKeyCallback: FingerprintAuthCallback,
 	}
 	cfg.AddHostKey(newHostKey(t))
 
-	tr := &Transport{Server: &xgitd.Server{Handler: h}, Config: cfg}
+	tr := &Transport{Server: &wire.Server{Handler: h}, Config: cfg}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -285,9 +283,9 @@ func TestParseGitCommand(t *testing.T) {
 		wantRepo    string
 		wantErr     bool
 	}{
-		{"git-upload-pack 'org/repo.git'", xgitd.ServiceUploadPack, "org/repo.git", false},
-		{`git-receive-pack "org/repo.git"`, xgitd.ServiceReceivePack, "org/repo.git", false},
-		{"git-upload-pack org/repo.git", xgitd.ServiceUploadPack, "org/repo.git", false},
+		{"git-upload-pack 'org/repo.git'", wire.ServiceUploadPack, "org/repo.git", false},
+		{`git-receive-pack "org/repo.git"`, wire.ServiceReceivePack, "org/repo.git", false},
+		{"git-upload-pack org/repo.git", wire.ServiceUploadPack, "org/repo.git", false},
 		{"git-upload-pack", "", "", true},
 		{"scp -t /tmp", "", "", true},
 		{"", "", "", true},

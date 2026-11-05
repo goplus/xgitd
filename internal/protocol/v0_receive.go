@@ -4,7 +4,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // DecodeReceivePackV0 decodes a v0 push (git-receive-pack) from r.

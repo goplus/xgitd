@@ -3,7 +3,7 @@ package protocol
 import (
 	"io"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // WriteLsRefs writes a v2 ls-refs response: one line per ref, terminated by a

@@ -17,13 +17,13 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 // Transport serves Git over SSH for a given [xgitd.Server].
 type Transport struct {
 	// Server dispatches decoded requests. Required.
-	Server *xgitd.Server
+	Server *wire.Server
 	// Config is the SSH server configuration. It must have at least one host
 	// key added. If NoClientAuth is false, the caller is responsible for
 	// supplying auth callbacks; this transport only reads the fingerprint of a
@@ -129,21 +129,21 @@ func (t *Transport) handleSession(ch gossh.Channel, reqs <-chan *gossh.Request, 
 func (t *Transport) runExec(ch gossh.Channel, cmdline, gitProtocol, user, remoteAddr string) {
 	service, repoArg, err := parseGitCommand(cmdline)
 	if err != nil {
-		_ = xgitd.WriteError(ch, err.Error())
+		_ = wire.WriteError(ch, err.Error())
 		sendExit(ch, 1)
 		return
 	}
 
-	repo, err := xgitd.NormalizeRepoPath(repoArg)
+	repo, err := wire.NormalizeRepoPath(repoArg)
 	if err != nil {
-		_ = xgitd.WriteError(ch, "invalid repository path")
+		_ = wire.WriteError(ch, "invalid repository path")
 		sendExit(ch, 1)
 		return
 	}
 
 	version := parseGitProtocol(gitProtocol)
 
-	s := &xgitd.Session{
+	s := &wire.Session{
 		Transport:  "ssh",
 		Service:    service,
 		Repo:       repo,
@@ -156,7 +156,7 @@ func (t *Transport) runExec(ch gossh.Channel, cmdline, gitProtocol, user, remote
 
 	ctx := context.Background()
 	if err := t.serve(ctx, s); err != nil {
-		_ = xgitd.WriteErrorFor(ch, err)
+		_ = wire.WriteErrorFor(ch, err)
 		sendExit(ch, 1)
 		return
 	}
@@ -169,7 +169,7 @@ func (t *Transport) runExec(ch gossh.Channel, cmdline, gitProtocol, user, remote
 // before the client sends its request. For v2, the server advertises its
 // capabilities first; the client then sends one or more commands on the same
 // channel (for example ls-refs then fetch), which DispatchV2 handles as a loop.
-func (t *Transport) serve(ctx context.Context, s *xgitd.Session) error {
+func (t *Transport) serve(ctx context.Context, s *wire.Session) error {
 	if s.Version == 2 {
 		if err := t.Server.WriteV2Advertisement(s); err != nil {
 			return err
@@ -204,18 +204,16 @@ func fingerprintFromPermissions(perms *gossh.Permissions) string {
 	return perms.Extensions["xgitd-fingerprint"]
 }
 
-// FingerprintAuthCallback returns a PublicKeyCallback that accepts every key and
+// FingerprintAuthCallback is a PublicKeyCallback that accepts every key and
 // records its fingerprint so it surfaces as [xgitd.Session.User]. It is a
 // convenience for the common "surface identity, authorize later" posture; real
 // deployments can supply their own callback instead.
-func FingerprintAuthCallback() func(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
-	return func(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
-		return &gossh.Permissions{
-			Extensions: map[string]string{
-				"xgitd-fingerprint": gossh.FingerprintSHA256(key),
-			},
-		}, nil
-	}
+func FingerprintAuthCallback(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
+	return &gossh.Permissions{
+		Extensions: map[string]string{
+			"xgitd-fingerprint": gossh.FingerprintSHA256(key),
+		},
+	}, nil
 }
 
 // sendExit sends an exit-status request on the channel.

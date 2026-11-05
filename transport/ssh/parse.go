@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 // execCommand extracts the command string from an "exec" request payload. The
@@ -61,7 +61,7 @@ func parseGitCommand(cmdline string) (service, repo string, err error) {
 		return "", "", fmt.Errorf("unsupported command %q", cmdline)
 	}
 	switch name {
-	case xgitd.ServiceUploadPack, xgitd.ServiceReceivePack:
+	case wire.ServiceUploadPack, wire.ServiceReceivePack:
 		service = name
 	default:
 		return "", "", fmt.Errorf("unsupported command %q", name)

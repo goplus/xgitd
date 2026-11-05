@@ -3,7 +3,7 @@ package protocol
 import (
 	"io"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // UploadPackResponder writes the server side of a v0 git-upload-pack

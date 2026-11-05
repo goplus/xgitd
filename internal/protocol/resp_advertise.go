@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // ZeroID is the all-zero object ID used on the wire to mean "no object": the old

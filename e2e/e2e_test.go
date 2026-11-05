@@ -27,16 +27,16 @@ import (
 
 	gossh "golang.org/x/crypto/ssh"
 
-	"github.com/goplus/xgitd"
 	xhttp "github.com/goplus/xgitd/transport/http"
 	xssh "github.com/goplus/xgitd/transport/ssh"
+	"github.com/goplus/xgitd/wire"
 )
 
 // recorder is a Handler that records each decoded request. For the operations
 // git needs to reach during ls-remote it writes a minimal empty advertisement
 // so git completes the exchange cleanly.
 type recorder struct {
-	xgitd.NopHandler
+	wire.NopHandler
 	mu   sync.Mutex
 	seen []string
 }
@@ -64,23 +64,23 @@ func (h *recorder) saw(substr string) bool {
 	return false
 }
 
-func (h *recorder) AdvertiseRefs(ctx context.Context, s *xgitd.Session) error {
+func (h *recorder) AdvertiseRefs(ctx context.Context, s *wire.Session) error {
 	h.record("advertise-refs transport=%s version=%d repo=%s user=%q", s.Transport, s.Version, s.Repo, s.User)
 	// An empty v0 ref advertisement is just a flush after the service banner.
 	_, _ = s.Out.Write([]byte("0000"))
 	return nil
 }
 
-func (h *recorder) LsRefs(ctx context.Context, s *xgitd.Session, req *xgitd.LsRefsRequest) error {
+func (h *recorder) LsRefs(ctx context.Context, s *wire.Session, req *wire.LsRefsRequest) error {
 	h.record("ls-refs transport=%s version=%d repo=%s prefixes=%v user=%q", s.Transport, s.Version, s.Repo, req.RefPrefixes, s.User)
 	// Report no refs.
 	_, _ = s.Out.Write([]byte("0000"))
 	return nil
 }
 
-func (h *recorder) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
+func (h *recorder) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
 	h.record("fetch transport=%s version=%d repo=%s wants=%d", s.Transport, s.Version, s.Repo, len(req.Wants))
-	return xgitd.ErrNotImplemented
+	return wire.ErrNotImplemented
 }
 
 func requireGit(t *testing.T) {
@@ -103,20 +103,20 @@ func requireSSHTools(t *testing.T) {
 }
 
 // startHTTP starts an httptest-style server and returns its base repo URL.
-func startHTTP(t *testing.T, h xgitd.Handler) string {
+func startHTTP(t *testing.T, h wire.Handler) string {
 	t.Helper()
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := &http.Server{Handler: xhttp.NewHandler(&xgitd.Server{Handler: h})}
+	srv := &http.Server{Handler: xhttp.NewHandler(&wire.Server{Handler: h})}
 	go srv.Serve(l)
 	t.Cleanup(func() { srv.Close() })
 	return fmt.Sprintf("http://%s/org/repo.git", l.Addr().String())
 }
 
 // startSSH starts an SSH transport and returns the port it listens on.
-func startSSH(t *testing.T, h xgitd.Handler) string {
+func startSSH(t *testing.T, h wire.Handler) string {
 	t.Helper()
 	_, hostKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -127,12 +127,10 @@ func startSSH(t *testing.T, h xgitd.Handler) string {
 		t.Fatal(err)
 	}
 	cfg := &gossh.ServerConfig{
-		PublicKeyCallback: func(conn gossh.ConnMetadata, key gossh.PublicKey) (*gossh.Permissions, error) {
-			return xssh.FingerprintAuthCallback()(conn, key)
-		},
+		PublicKeyCallback: xssh.FingerprintAuthCallback,
 	}
 	cfg.AddHostKey(signer)
-	tr := &xssh.Transport{Server: &xgitd.Server{Handler: h}, Config: cfg}
+	tr := &xssh.Transport{Server: &wire.Server{Handler: h}, Config: cfg}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

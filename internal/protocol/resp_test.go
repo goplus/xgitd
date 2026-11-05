@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // collectPackets reads every pkt-line from s and returns them as a slice where

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // ErrNegotiationIncomplete is returned by the section methods that must precede

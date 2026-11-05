@@ -1,6 +1,6 @@
-package xgitd
+package wire
 
-import "github.com/goplus/xgitd/protocol"
+import "github.com/goplus/xgitd/internal/protocol"
 
 // The decoded request types live in the protocol package so the decoders and
 // the Handler interface can share them without an import cycle. They are

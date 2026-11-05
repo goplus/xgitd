@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/goplus/xgitd/pktline"
+	"github.com/goplus/xgitd/internal/pktline"
 )
 
 // ErrNoMoreCommands is returned by [V2Decoder.Next] when the client ends a v2

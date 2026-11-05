@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 // repoHandler is a handler backed by a real on-disk git repository. It uses the
@@ -19,7 +19,7 @@ import (
 // prove, against the real git client, that the response writers frame a
 // complete, clonable response.
 type repoHandler struct {
-	xgitd.NopHandler
+	wire.NopHandler
 	dir string
 }
 
@@ -35,13 +35,13 @@ func (h *repoHandler) git(args ...string) ([]byte, error) {
 }
 
 // refs returns the repository's refs, HEAD first with its symref target.
-func (h *repoHandler) refs() ([]xgitd.Ref, error) {
+func (h *repoHandler) refs() ([]wire.Ref, error) {
 	headOID, err := h.git("rev-parse", "HEAD")
 	if err != nil {
 		return nil, err
 	}
 	sym, _ := h.git("symbolic-ref", "HEAD")
-	refs := []xgitd.Ref{{
+	refs := []wire.Ref{{
 		Name:         "HEAD",
 		ID:           strings.TrimSpace(string(headOID)),
 		SymrefTarget: strings.TrimSpace(string(sym)),
@@ -53,7 +53,7 @@ func (h *repoHandler) refs() ([]xgitd.Ref, error) {
 	for _, line := range strings.Split(strings.TrimSpace(string(showRef)), "\n") {
 		f := strings.Fields(line)
 		if len(f) == 2 {
-			refs = append(refs, xgitd.Ref{Name: f[1], ID: f[0]})
+			refs = append(refs, wire.Ref{Name: f[1], ID: f[0]})
 		}
 	}
 	return refs, nil
@@ -72,20 +72,20 @@ func (h *repoHandler) buildPack(wants []string) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func (h *repoHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) error {
+func (h *repoHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error {
 	refs, err := h.refs()
 	if err != nil {
 		return err
 	}
-	return xgitd.WriteRefAdvertisementV0(s, xgitd.RefAdvertisementV0{
+	return wire.WriteRefAdvertisementV0(s, wire.RefAdvertisementV0{
 		Service:      s.Service,
 		Refs:         refs,
 		Capabilities: []string{"side-band-64k", "ofs-delta", "agent=git/xgitd"},
 	})
 }
 
-func (h *repoHandler) UploadPack(ctx context.Context, s *xgitd.Session, req *xgitd.UploadPackRequest) error {
-	resp := xgitd.NewUploadPackResponder(s, req.Capabilities.Has("side-band-64k"))
+func (h *repoHandler) UploadPack(ctx context.Context, s *wire.Session, req *wire.UploadPackRequest) error {
+	resp := wire.NewUploadPackResponder(s, req.Capabilities.Has("side-band-64k"))
 	if err := resp.NAK(); err != nil {
 		return err
 	}
@@ -100,16 +100,16 @@ func (h *repoHandler) UploadPack(ctx context.Context, s *xgitd.Session, req *xgi
 	return finish()
 }
 
-func (h *repoHandler) LsRefs(ctx context.Context, s *xgitd.Session, req *xgitd.LsRefsRequest) error {
+func (h *repoHandler) LsRefs(ctx context.Context, s *wire.Session, req *wire.LsRefsRequest) error {
 	refs, err := h.refs()
 	if err != nil {
 		return err
 	}
-	return xgitd.WriteLsRefs(s, req, refs)
+	return wire.WriteLsRefs(s, req, refs)
 }
 
-func (h *repoHandler) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
-	resp := xgitd.NewFetchResponder(s)
+func (h *repoHandler) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
+	resp := wire.NewFetchResponder(s)
 	// When the client is negotiating (it sent haves but has not said done), the
 	// protocol requires an acknowledgments section before the packfile. This
 	// simple handler always has the full history, so it acknowledges the

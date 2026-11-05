@@ -45,10 +45,7 @@ func (sb *SideBandWriter) write(channel byte, p []byte) error {
 func (sb *SideBandWriter) WriteData(p []byte) (int, error) {
 	total := 0
 	for len(p) > 0 {
-		n := len(p)
-		if n > maxSideBandPayload {
-			n = maxSideBandPayload
-		}
+		n := min(len(p), maxSideBandPayload)
 		if err := sb.write(SideBandData, p[:n]); err != nil {
 			return total, err
 		}

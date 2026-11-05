@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/goplus/xgitd"
+	"github.com/goplus/xgitd/wire"
 )
 
 func pkt(items ...string) string {
@@ -36,17 +36,17 @@ func pkt(items ...string) string {
 }
 
 type recordHandler struct {
-	xgitd.NopHandler
+	wire.NopHandler
 	advertised  bool
 	version     int
 	repo        string
 	user        string
-	uploadPack  *xgitd.UploadPackRequest
-	receivePack *xgitd.ReceivePackRequest
-	fetch       *xgitd.FetchRequest
+	uploadPack  *wire.UploadPackRequest
+	receivePack *wire.ReceivePackRequest
+	fetch       *wire.FetchRequest
 }
 
-func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) error {
+func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error {
 	h.advertised = true
 	h.version = s.Version
 	h.repo = s.Repo
@@ -55,23 +55,23 @@ func (h *recordHandler) AdvertiseRefs(ctx context.Context, s *xgitd.Session) err
 	_, _ = io.WriteString(s.Out, "0000")
 	return nil
 }
-func (h *recordHandler) UploadPack(ctx context.Context, s *xgitd.Session, req *xgitd.UploadPackRequest) error {
+func (h *recordHandler) UploadPack(ctx context.Context, s *wire.Session, req *wire.UploadPackRequest) error {
 	h.uploadPack = req
 	h.repo = s.Repo
 	return nil // pretend success; no body needed for the test
 }
-func (h *recordHandler) ReceivePack(ctx context.Context, s *xgitd.Session, req *xgitd.ReceivePackRequest) error {
+func (h *recordHandler) ReceivePack(ctx context.Context, s *wire.Session, req *wire.ReceivePackRequest) error {
 	h.receivePack = req
 	return nil
 }
-func (h *recordHandler) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
+func (h *recordHandler) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
 	h.fetch = req
 	h.version = s.Version
 	return nil
 }
 
-func newTestServer(h xgitd.Handler) *httptest.Server {
-	return httptest.NewServer(NewHandler(&xgitd.Server{Handler: h}))
+func newTestServer(h wire.Handler) *httptest.Server {
+	return httptest.NewServer(NewHandler(&wire.Server{Handler: h}))
 }
 
 func TestInfoRefsV0(t *testing.T) {
@@ -147,7 +147,7 @@ func TestInfoRefsV0NotImplementedReturns501(t *testing.T) {
 	// A NopHandler's AdvertiseRefs returns ErrNotImplemented and writes nothing,
 	// so a v0 discovery must yield 501 rather than a 200 with a half-formed
 	// advertisement.
-	ts := newTestServer(xgitd.NopHandler{})
+	ts := newTestServer(wire.NopHandler{})
 	defer ts.Close()
 	resp, err := http.Get(ts.URL + "/org/repo.git/info/refs?service=git-upload-pack")
 	if err != nil {
@@ -236,7 +236,7 @@ func TestPostGzipBody(t *testing.T) {
 
 func TestPostNotImplementedReturns501(t *testing.T) {
 	// NopHandler returns ErrNotImplemented and writes nothing.
-	ts := newTestServer(xgitd.NopHandler{})
+	ts := newTestServer(wire.NopHandler{})
 	defer ts.Close()
 
 	oid := strings.Repeat("a", 40)

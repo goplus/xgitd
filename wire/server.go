@@ -1,4 +1,4 @@
-package xgitd
+package wire
 
 import (
 	"context"
@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/goplus/xgitd/pktline"
-	"github.com/goplus/xgitd/protocol"
+	"github.com/goplus/xgitd/internal/pktline"
+	"github.com/goplus/xgitd/internal/protocol"
 )
 
 // Services.
