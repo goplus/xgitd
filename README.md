@@ -57,13 +57,13 @@ import "github.com/goplus/xgitd/wire"
 
 type repoHandler struct{ wire.BaseHandler }
 
-func (h repoHandler) LsRefs(ctx context.Context, s *xgitd.Session, req *xgitd.LsRefsRequest) error {
-	refs := []xgitd.Ref{{Name: "HEAD", ID: headOID, SymrefTarget: "refs/heads/main"}, /* … */}
-	return xgitd.WriteLsRefs(s, req, refs)
+func (h repoHandler) LsRefs(ctx context.Context, s *wire.Session, req *wire.LsRefsRequest) error {
+	refs := []wire.Ref{{Name: "HEAD", ID: headOID, SymrefTarget: "refs/heads/main"}, /* … */}
+	return wire.WriteLsRefs(s, req, refs)
 }
 
-func (h repoHandler) Fetch(ctx context.Context, s *xgitd.Session, req *xgitd.FetchRequest) error {
-	resp := xgitd.NewFetchResponder(s)
+func (h repoHandler) Fetch(ctx context.Context, s *wire.Session, req *wire.FetchRequest) error {
+	resp := wire.NewFetchResponder(s)
 	w, finish, err := resp.PackSection()
 	if err != nil {
 		return err
