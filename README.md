@@ -1,29 +1,7 @@
 # xgitd
 
-`xgitd` is a lightweight Git server skeleton written in Go. It accepts
-connections over **SSH** and **Smart HTTP**, speaks Git wire protocol **v0** and
-**v2**, decodes every request into typed Go values, hands each one to a single
-[`Handler`](handler.go) interface, and gives that handler the mechanisms it
-needs to write a protocol-correct response.
-
-## Package layout
-
-```
-xgitd/
-├── pktline/            framing: read/write pkt-lines, flush/delim/response-end, side-band
-├── protocol/           version/capability handling, v0 and v2 request decoders and response writers
-├── transport/
-│   ├── ssh/            SSH exec requests  -> Session
-│   └── http/           Smart HTTP routes  -> Session
-├── handler.go          Handler interface, Session, NopHandler, ErrNotImplemented
-├── server.go           Server: decode-and-dispatch to the Handler
-├── types.go            request/response type aliases and Session-based response helpers
-├── repopath.go         repository-path normalization
-└── cmd/xgitd/          example binary wiring everything together
-```
-
-The layers are independent packages and usable on their own: `pktline` has no
-dependency on `protocol`, and `protocol` has no dependency on the transports.
+xgitd is a lightweight Git server skeleton written in Go. It accepts connections
+over **SSH** and **Smart HTTP**, speaks Git wire protocol **v0** and **v2**.
 
 ## What it decodes and dispatches
 
@@ -49,9 +27,10 @@ its own POST.
 
 ## Writing responses
 
-The handler decides *what* to send; `xgitd` frames it correctly on the wire.
-Each response mechanism is available both as a method in the `protocol` package
-and, for convenience, as a `Session`-based helper on the `xgitd` package:
+The handler decides *what* to send; `xgitd/wire` frames it correctly on the wire.
+Each response mechanism is available both as a method in the `internal/protocol`
+package and, for convenience, as a `Session`-based helper on the `xgitd/wire`
+package:
 
 | Response | Helper |
 |---|---|
@@ -70,11 +49,13 @@ hand-assemble pkt-lines. A handler is still free to write raw bytes to
 
 ## Usage
 
-Embed `NopHandler` and override only the operations you care about. A handler
+Embed `wire.BaseHandler` and override only the operations you care about. A handler
 that serves refs and a packfile looks like:
 
 ```go
-type repoHandler struct{ xgitd.NopHandler }
+import "github.com/goplus/xgitd/wire"
+
+type repoHandler struct{ wire.BaseHandler }
 
 func (h repoHandler) LsRefs(ctx context.Context, s *xgitd.Session, req *xgitd.LsRefsRequest) error {
 	refs := []xgitd.Ref{{Name: "HEAD", ID: headOID, SymrefTarget: "refs/heads/main"}, /* … */}
@@ -105,9 +86,9 @@ go run ./cmd/xgitd -http :8080 -ssh :2222
 ## Testing
 
 ```sh
-go test ./...                       # unit, transport, and end-to-end tests
-go test -short ./...                # skip the tests that shell out to real git
-go test -fuzz FuzzReader ./pktline  # fuzz the pkt-line reader
+go test ./...                                # unit, transport, and end-to-end tests
+go test -short ./...                         # skip the tests that shell out to real git
+go test -fuzz FuzzReader ./internal/pktline  # fuzz the pkt-line reader
 ```
 
 The `e2e` package drives the real `git` client over both SSH and HTTP at

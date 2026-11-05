@@ -36,7 +36,7 @@ func pkt(items ...string) string {
 }
 
 type recordHandler struct {
-	wire.NopHandler
+	wire.BaseHandler
 	advertised  bool
 	version     int
 	repo        string
@@ -147,7 +147,7 @@ func TestInfoRefsV0NotImplementedReturns501(t *testing.T) {
 	// A NopHandler's AdvertiseRefs returns ErrNotImplemented and writes nothing,
 	// so a v0 discovery must yield 501 rather than a 200 with a half-formed
 	// advertisement.
-	ts := newTestServer(wire.NopHandler{})
+	ts := newTestServer(wire.BaseHandler{})
 	defer ts.Close()
 	resp, err := http.Get(ts.URL + "/org/repo.git/info/refs?service=git-upload-pack")
 	if err != nil {
@@ -236,7 +236,7 @@ func TestPostGzipBody(t *testing.T) {
 
 func TestPostNotImplementedReturns501(t *testing.T) {
 	// NopHandler returns ErrNotImplemented and writes nothing.
-	ts := newTestServer(wire.NopHandler{})
+	ts := newTestServer(wire.BaseHandler{})
 	defer ts.Close()
 
 	oid := strings.Repeat("a", 40)

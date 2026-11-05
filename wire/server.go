@@ -30,7 +30,7 @@ type Server struct {
 // handler returns the configured handler or a NopHandler.
 func (srv *Server) handler() Handler {
 	if srv.Handler == nil {
-		return NopHandler{}
+		return BaseHandler{}
 	}
 	return srv.Handler
 }

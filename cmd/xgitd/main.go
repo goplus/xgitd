@@ -40,7 +40,7 @@ import (
 // logHandler embeds NopHandler and logs each decoded request before deferring
 // to the empty implementation (which returns ErrNotImplemented).
 type logHandler struct {
-	wire.NopHandler
+	wire.BaseHandler
 }
 
 func (logHandler) AdvertiseRefs(ctx context.Context, s *wire.Session) error {

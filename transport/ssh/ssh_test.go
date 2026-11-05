@@ -39,7 +39,7 @@ func pkt(items ...string) string {
 }
 
 type recordHandler struct {
-	wire.NopHandler
+	wire.BaseHandler
 	mu          sync.Mutex
 	advertised  bool
 	session     wire.Session

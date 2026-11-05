@@ -36,7 +36,7 @@ import (
 // git needs to reach during ls-remote it writes a minimal empty advertisement
 // so git completes the exchange cleanly.
 type recorder struct {
-	wire.NopHandler
+	wire.BaseHandler
 	mu   sync.Mutex
 	seen []string
 }

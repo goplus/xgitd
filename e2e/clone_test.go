@@ -19,7 +19,7 @@ import (
 // prove, against the real git client, that the response writers frame a
 // complete, clonable response.
 type repoHandler struct {
-	wire.NopHandler
+	wire.BaseHandler
 	dir string
 }
 

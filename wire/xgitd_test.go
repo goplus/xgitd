@@ -51,7 +51,7 @@ func TestNormalizeRepoPath(t *testing.T) {
 }
 
 func TestNopHandlerReturnsNotImplemented(t *testing.T) {
-	var h NopHandler
+	var h BaseHandler
 	ctx := context.Background()
 	s := &Session{}
 	errs := []error{
@@ -71,7 +71,7 @@ func TestNopHandlerReturnsNotImplemented(t *testing.T) {
 
 // recordHandler embeds NopHandler and records which requests it saw.
 type recordHandler struct {
-	NopHandler
+	BaseHandler
 	uploadPack  *UploadPackRequest
 	receivePack *ReceivePackRequest
 	lsRefs      *LsRefsRequest

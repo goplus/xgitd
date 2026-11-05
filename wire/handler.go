@@ -16,7 +16,7 @@ import (
 	"io"
 )
 
-// ErrNotImplemented is returned by [NopHandler] methods and by any handler that
+// ErrNotImplemented is returned by [BaseHandler] methods and by any handler that
 // has not implemented a particular request. Transports translate it into the
 // protocol's "not implemented" signal: an ERR pkt-line for SSH, and HTTP 501
 // when nothing has been written to the client yet.
@@ -54,7 +54,7 @@ type Session struct {
 // side-band writer from the pktline package) and return nil, or return
 // [ErrNotImplemented] / another error to signal failure.
 //
-// Implementations should embed [NopHandler] so that protocol operations added
+// Implementations should embed [BaseHandler] so that protocol operations added
 // to this interface later do not break existing handlers.
 type Handler interface {
 	// AdvertiseRefs is the v0 reference advertisement. In v0 the advertised
@@ -73,39 +73,39 @@ type Handler interface {
 	ObjectInfo(ctx context.Context, s *Session, req *ObjectInfoRequest) error
 }
 
-// NopHandler is the empty [Handler]: every method returns [ErrNotImplemented].
+// BaseHandler is the empty [Handler]: every method returns [ErrNotImplemented].
 // Embed it to implement only the operations you care about.
-type NopHandler struct{}
+type BaseHandler struct{}
 
 // AdvertiseRefs implements [Handler].
-func (NopHandler) AdvertiseRefs(ctx context.Context, s *Session) error {
+func (BaseHandler) AdvertiseRefs(ctx context.Context, s *Session) error {
 	return ErrNotImplemented
 }
 
 // UploadPack implements [Handler].
-func (NopHandler) UploadPack(ctx context.Context, s *Session, req *UploadPackRequest) error {
+func (BaseHandler) UploadPack(ctx context.Context, s *Session, req *UploadPackRequest) error {
 	return ErrNotImplemented
 }
 
 // ReceivePack implements [Handler].
-func (NopHandler) ReceivePack(ctx context.Context, s *Session, req *ReceivePackRequest) error {
+func (BaseHandler) ReceivePack(ctx context.Context, s *Session, req *ReceivePackRequest) error {
 	return ErrNotImplemented
 }
 
 // LsRefs implements [Handler].
-func (NopHandler) LsRefs(ctx context.Context, s *Session, req *LsRefsRequest) error {
+func (BaseHandler) LsRefs(ctx context.Context, s *Session, req *LsRefsRequest) error {
 	return ErrNotImplemented
 }
 
 // Fetch implements [Handler].
-func (NopHandler) Fetch(ctx context.Context, s *Session, req *FetchRequest) error {
+func (BaseHandler) Fetch(ctx context.Context, s *Session, req *FetchRequest) error {
 	return ErrNotImplemented
 }
 
 // ObjectInfo implements [Handler].
-func (NopHandler) ObjectInfo(ctx context.Context, s *Session, req *ObjectInfoRequest) error {
+func (BaseHandler) ObjectInfo(ctx context.Context, s *Session, req *ObjectInfoRequest) error {
 	return ErrNotImplemented
 }
 
 // Ensure NopHandler satisfies Handler.
-var _ Handler = NopHandler{}
+var _ Handler = BaseHandler{}
