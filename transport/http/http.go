@@ -93,6 +93,11 @@ func (h *Handler) serveInfoRefs(w http.ResponseWriter, r *http.Request, rawRepo 
 		Out:        &body,
 	}
 
+	if err := h.Server.Authorize(r.Context(), s); err != nil {
+		writeAuthError(w, err)
+		return
+	}
+
 	// The service banner is a pkt-line "# service=<name>\n" followed by a
 	// flush, then the advertisement body.
 	if err := writeServiceBanner(&body, service); err != nil {
@@ -133,13 +138,6 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 		return
 	}
 
-	body, err := requestBody(r)
-	if err != nil {
-		http.Error(w, "bad request body", http.StatusBadRequest)
-		return
-	}
-	defer body.Close()
-
 	version := parseGitProtocol(r.Header.Get("Git-Protocol"))
 
 	setNoCache(w)
@@ -155,9 +153,29 @@ func (h *Handler) servePost(w http.ResponseWriter, r *http.Request, rawRepo, ser
 		Version:    version,
 		User:       basicAuthUser(r),
 		RemoteAddr: r.RemoteAddr,
-		In:         body,
 		Out:        rw,
 	}
+
+	// Authorize before the body is touched, so an unauthorized client causes no
+	// decode work (not even the gzip header) and always gets a clean status.
+	if err := h.Server.Authorize(r.Context(), s); err != nil {
+		// Drain a bounded prefix of the raw (still-undecoded) body before
+		// replying, so a rejected request can keep its connection alive. Go's
+		// server only auto-drains up to maxDrainOnReject (256 KiB) before forcing
+		// Connection: close, and a receive-pack body routinely exceeds that.
+		// Draining the raw bytes keeps the "no decode work" property.
+		_, _ = io.CopyN(io.Discard, r.Body, maxDrainOnReject)
+		writeAuthError(w, err)
+		return
+	}
+
+	body, err := requestBody(r)
+	if err != nil {
+		http.Error(w, "bad request body", http.StatusBadRequest)
+		return
+	}
+	defer body.Close()
+	s.In = body
 
 	if err := h.Server.Dispatch(r.Context(), s); err != nil {
 		h.reportPostError(rw, err)
@@ -224,4 +242,24 @@ func setNoCache(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Expires", "Fri, 01 Jan 1980 00:00:00 GMT")
 	w.Header().Set("Pragma", "no-cache")
+}
+
+// maxDrainOnReject bounds how much of a rejected request's body is drained to
+// keep the connection reusable. It mirrors net/http's own maxPostHandlerReadBytes
+// (256 KiB): draining up to this much lets small-to-moderate bodies keep the
+// connection alive, while a larger body is abandoned (the connection closes)
+// rather than paying to read an unbounded upload we are discarding anyway.
+const maxDrainOnReject = 256 << 10
+
+// writeAuthError reports an authorization failure. ErrUnauthorized becomes a 403
+// Forbidden; any other error from the authorizer is an internal failure and is
+// reported generically so authorization internals do not leak to the client. The
+// body reuses [wire.ClientErrorMessage] so SSH and Smart HTTP use one vocabulary
+// for the same sentinel.
+func writeAuthError(w http.ResponseWriter, err error) {
+	if errors.Is(err, wire.ErrUnauthorized) {
+		http.Error(w, wire.ClientErrorMessage(err), http.StatusForbidden)
+		return
+	}
+	http.Error(w, wire.ClientErrorMessage(err), http.StatusInternalServerError)
 }

@@ -25,6 +25,10 @@ type Server struct {
 	// Capabilities is the static v2 capability advertisement. When it is the
 	// zero value, DefaultCapabilityAdvertisement is used.
 	Capabilities protocol.CapabilityAdvertisement
+	// Authorizer, when set, gates every session: the transport calls
+	// [Server.Authorize] once before advertising or dispatching, and a rejected
+	// session never reaches the Handler. When nil, every session is allowed.
+	Authorizer Authorizer
 }
 
 // WriteV2Advertisement writes the static v2 capability advertisement to s.Out.
@@ -130,15 +134,22 @@ func WriteError(w io.Writer, msg string) error {
 // It keeps the "not implemented" case recognizable and hides any other error
 // behind a generic message so internal detail does not leak to clients.
 func WriteErrorFor(w io.Writer, err error) error {
-	return WriteError(w, errorMessage(err))
+	return WriteError(w, ClientErrorMessage(err))
 }
 
-// errorMessage maps a handler error to the client-facing message. It keeps the
-// "not implemented" case recognizable and hides the detail of any other error
-// behind a generic message, since internal errors should not leak to clients.
-func errorMessage(err error) string {
-	if errors.Is(err, ErrNotImplemented) {
+// ClientErrorMessage maps an error to the client-facing message that transports
+// surface to the client. It keeps the "not implemented" and "unauthorized" cases
+// recognizable and hides the detail of any other error behind a generic message,
+// since internal errors should not leak to clients. Transports use it as the
+// single source of truth for this wording (for example, the Smart HTTP 403 body
+// and the SSH ERR pkt-line share it).
+func ClientErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, ErrNotImplemented):
 		return "not implemented"
+	case errors.Is(err, ErrUnauthorized):
+		return "unauthorized"
+	default:
+		return "internal server error"
 	}
-	return "internal server error"
 }

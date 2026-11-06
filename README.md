@@ -86,6 +86,36 @@ repository that `git clone` and `git fetch` succeed against:
 go run ./cmd/xgitd -http :8080 -ssh :2222
 ```
 
+## Authorization
+
+By default every session is allowed and authorization is left to the handler.
+To gate access across both transports from one place, set `Server.Authorizer`.
+The hook runs after the transport has populated the `Session` (`Service`,
+`Repo`, `User`, `RemoteAddr`, `Version`) but before any advertisement or request
+dispatch — so a rejected session never reaches the `Handler`:
+
+```go
+srv := &wire.Server{
+	Handler: repoHandler{},
+	Authorizer: wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		if s.Service == wire.ServiceReceivePack && !mayPush(s.User, s.Repo) {
+			return fmt.Errorf("%q may not push to %q: %w", s.User, s.Repo, wire.ErrUnauthorized)
+		}
+		return nil
+	}),
+}
+```
+
+Return `nil` to allow, `wire.ErrUnauthorized` (optionally wrapped with context)
+to reject, or any other error to abort as an internal failure. A rejection
+becomes an `ERR unauthorized` pkt-line over SSH and an HTTP `403 Forbidden` over
+Smart HTTP; the wrapped detail stays server-side and never leaks to the client.
+Decide on the metadata alone: `s.In` may be nil (and must not be read) and
+`s.Out` must not be written. Note the hook runs per request, not per operation,
+so over Smart HTTP a single clone/fetch/push invokes it twice (on `info/refs`
+and on the POST); keep it idempotent and side-effect-free. The example binary's
+`-read-only` flag shows the pattern.
+
 ## Testing
 
 ```sh

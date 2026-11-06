@@ -101,13 +101,18 @@ func newHostKey(t *testing.T) gossh.Signer {
 // startServer wires a Transport onto an in-memory listener and returns its
 // address.
 func startServer(t *testing.T, h wire.Handler) (net.Listener, *Transport) {
+	return startServerWithAuth(t, h, nil)
+}
+
+// startServerWithAuth is startServer plus an optional Authorizer on the Server.
+func startServerWithAuth(t *testing.T, h wire.Handler, auth wire.Authorizer) (net.Listener, *Transport) {
 	t.Helper()
 	cfg := &gossh.ServerConfig{
 		PublicKeyCallback: FingerprintAuthCallback,
 	}
 	cfg.AddHostKey(newHostKey(t))
 
-	tr := &Transport{Server: &wire.Server{Handler: h}, Config: cfg}
+	tr := &Transport{Server: &wire.Server{Handler: h, Authorizer: auth}, Config: cfg}
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -273,6 +278,61 @@ func TestSSHUnsupportedCommand(t *testing.T) {
 	}
 	if !strings.Contains(string(out), "ERR") {
 		t.Fatalf("expected ERR pkt-line, got %q", out)
+	}
+}
+
+func TestSSHAuthorizeRejects(t *testing.T) {
+	var seen *wire.Session
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		seen = s
+		return wire.ErrUnauthorized
+	})
+	h := &recordHandler{}
+	l, _ := startServerWithAuth(t, h, auth)
+	defer l.Close()
+	client := dial(t, l.Addr().String())
+	defer client.Close()
+
+	oid := strings.Repeat("a", 40)
+	stdin := pkt("want "+oid+" ofs-delta\n", "FLUSH", "done\n")
+	out, err := runExec(t, client, "", "git-upload-pack 'org/repo.git'", stdin)
+	// A rejected session exits non-zero with an ERR pkt-line, and the handler
+	// must never be reached.
+	if err == nil {
+		t.Fatal("expected non-zero exit for unauthorized session")
+	}
+	if !strings.Contains(string(out), "ERR unauthorized") {
+		t.Fatalf("expected ERR unauthorized pkt-line, got %q", out)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.advertised || h.uploadPack != nil {
+		t.Fatal("handler was reached despite an unauthorized session")
+	}
+	if seen == nil || seen.Repo != "org/repo.git" {
+		t.Fatalf("authorizer did not see the session: %+v", seen)
+	}
+}
+
+func TestSSHAuthorizeAllows(t *testing.T) {
+	auth := wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+		return nil // allow
+	})
+	h := &recordHandler{}
+	l, _ := startServerWithAuth(t, h, auth)
+	defer l.Close()
+	client := dial(t, l.Addr().String())
+	defer client.Close()
+
+	oid := strings.Repeat("a", 40)
+	stdin := pkt("want "+oid+" ofs-delta\n", "FLUSH", "done\n")
+	if _, err := runExec(t, client, "", "git-upload-pack 'org/repo.git'", stdin); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if !h.advertised || h.uploadPack == nil {
+		t.Fatal("handler not reached for an allowed session")
 	}
 }
 

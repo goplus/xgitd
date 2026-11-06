@@ -27,6 +27,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -81,9 +82,24 @@ func (logHandler) ObjectInfo(ctx context.Context, s *wire.Session, req *wire.Obj
 func main() {
 	httpAddr := flag.String("http", ":8080", "Smart HTTP listen address (empty to disable)")
 	sshAddr := flag.String("ssh", ":2222", "SSH listen address (empty to disable)")
+	readOnly := flag.Bool("read-only", false, "reject pushes (git-receive-pack) via the Authorizer hook")
 	flag.Parse()
 
 	srv := &wire.Server{Handler: logHandler{}}
+
+	// The Authorizer hook gates every session before the handler sees it. Here
+	// it implements an optional read-only policy; a real deployment would check
+	// s.User (the SSH key fingerprint or HTTP basic-auth user), s.Repo, and
+	// s.Service against its own access-control rules.
+	if *readOnly {
+		srv.Authorizer = wire.AuthorizeFunc(func(ctx context.Context, s *wire.Session) error {
+			if s.Service == wire.ServiceReceivePack {
+				log.Printf("denying push to %s by %q", s.Repo, s.User)
+				return fmt.Errorf("server is read-only: %w", wire.ErrUnauthorized)
+			}
+			return nil
+		})
+	}
 
 	errc := make(chan error, 2)
 
